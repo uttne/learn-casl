@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { OrganizationPlan } from "@/lib/authz/contract";
+import type { RowFocus } from "@/sample/run-action";
 import type { FieldAccess } from "@/lib/authz/present";
 import {
   classificationLabel,
@@ -84,19 +85,28 @@ export function Comparison({
   matrix,
   personas,
   selectedId,
+  focus,
   onSelect,
 }: {
   matrix: AccessMatrix;
   personas: Persona[];
   selectedId: string;
+  focus: RowFocus;
   onSelect: (userId: string) => void;
 }) {
   const views = indexViews(matrix);
+  const projectFocus = new Set(focus.projectIds);
+  const documentFocus = new Set(focus.documentIds);
+  const organizationFocus = new Set(focus.organizationIds);
+
+  useEffect(() => {
+    document.querySelector("[data-focus='true']")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [focus]);
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-2">
       <p className="shrink-0 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-        保存されている内容と、各アカウントの API が返す値です。列を選ぶと、左の動作画面がその人に切り替わります。
+        見本のデータの対応表です。左の操作では行は増えません。操作した行は色が変わります。プロジェクトの作成は、追加先の組織にあるプロジェクトの行が対象です。
       </p>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
         <TopScroll>
@@ -138,6 +148,8 @@ export function Comparison({
                 project={project}
                 personas={personas}
                 selectedId={selectedId}
+                projectFocused={projectFocus.has(project.id) || organizationFocus.has(project.organization.id)}
+                documentFocus={documentFocus}
                 views={views}
               />
             ))}
@@ -185,21 +197,33 @@ function TopScroll({ children }: { children: ReactNode }) {
   );
 }
 
+function cellTone(focused: boolean, selected: boolean, resting: string) {
+  if (focused && selected) return "bg-amber-200 dark:bg-amber-900";
+  if (focused) return "bg-amber-100 dark:bg-amber-950";
+  if (selected) return "bg-emerald-50 dark:bg-emerald-950/40";
+  return resting;
+}
+
 function ProjectRows({
   project,
   personas,
   selectedId,
+  projectFocused,
+  documentFocus,
   views,
 }: {
   project: StoredProject;
   personas: Persona[];
   selectedId: string;
+  projectFocused: boolean;
+  documentFocus: Set<string>;
   views: ReturnType<typeof indexViews>;
 }) {
+  const projectTone = cellTone(projectFocused, false, "bg-zinc-50 dark:bg-zinc-900");
   return (
     <>
-      <tr className="border-t border-zinc-200 bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-900/40">
-        <th className="sticky left-0 z-10 bg-zinc-50 p-3 text-left font-medium dark:bg-zinc-900">
+      <tr className="border-t border-zinc-200 dark:border-zinc-800" data-focus={projectFocused ? "true" : undefined}>
+        <th className={`sticky left-0 z-10 p-3 text-left font-medium ${projectTone}`}>
           <span className="block">{project.title}</span>
           <span className="mt-1 block text-xs font-normal leading-5 text-zinc-500">
             {project.organization.name} / {visibilityLabel[project.visibility]} / {project.department} / 状態 {projectStatusLabel[project.status]} / 所有者 {project.owner.name}
@@ -207,30 +231,35 @@ function ProjectRows({
         </th>
         {personas.map((persona) => {
           const returned = views.get(persona.id)?.has(project.id) ?? false;
+          const selected = persona.id === selectedId;
           return (
-            <td key={persona.id} className={`p-3 ${persona.id === selectedId ? "bg-emerald-50 dark:bg-emerald-950/40" : ""}`}>
+            <td key={persona.id} className={`p-3 ${cellTone(projectFocused, selected, "bg-zinc-50 dark:bg-zinc-900")}`}>
               <span className={returned ? "text-emerald-700 dark:text-emerald-400" : "text-zinc-400"}>{returned ? "返る" : "返らない"}</span>
             </td>
           );
         })}
       </tr>
-      {project.documents.map((document) => (
-        <tr key={document.id} className="border-t border-zinc-100 dark:border-zinc-900">
-          <th className="sticky left-0 z-10 bg-white p-3 pl-6 text-left font-normal dark:bg-zinc-950">
-            <span className="block font-medium">{document.title}</span>
-            <span className="mt-1 block text-xs leading-5 text-zinc-500">
-              {classificationLabel(document.classificationRank)} / {documentStatusLabel[document.status]} / {document.author.name}
-            </span>
-            <span className="mt-1 block leading-5 text-zinc-700 dark:text-zinc-300">{document.body}</span>
-            <span className="block text-xs text-zinc-500">{document.author.email}</span>
-          </th>
-          {personas.map((persona) => (
-            <td key={persona.id} className={`p-3 align-top ${persona.id === selectedId ? "bg-emerald-50 dark:bg-emerald-950/40" : ""}`}>
-              <DocumentCell document={views.get(persona.id)?.get(project.id)?.get(document.id)} />
-            </td>
-          ))}
-        </tr>
-      ))}
+      {project.documents.map((document) => {
+        const focused = documentFocus.has(document.id);
+        const documentTone = cellTone(focused, false, "bg-white dark:bg-zinc-950");
+        return (
+          <tr key={document.id} className="border-t border-zinc-100 dark:border-zinc-900" data-focus={focused ? "true" : undefined}>
+            <th className={`sticky left-0 z-10 p-3 pl-6 text-left font-normal ${documentTone}`}>
+              <span className="block font-medium">{document.title}</span>
+              <span className="mt-1 block text-xs leading-5 text-zinc-500">
+                {classificationLabel(document.classificationRank)} / {documentStatusLabel[document.status]} / {document.author.name}
+              </span>
+              <span className="mt-1 block leading-5 text-zinc-700 dark:text-zinc-300">{document.body}</span>
+              <span className="block text-xs text-zinc-500">{document.author.email}</span>
+            </th>
+            {personas.map((persona) => (
+              <td key={persona.id} className={`p-3 align-top ${cellTone(focused, persona.id === selectedId, "bg-white dark:bg-zinc-950")}`}>
+                <DocumentCell document={views.get(persona.id)?.get(project.id)?.get(document.id)} />
+              </td>
+            ))}
+          </tr>
+        );
+      })}
     </>
   );
 }

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Comparison, type AccessMatrix } from "@/guide/comparison";
 import type { Feature, FeatureState, OrganizationPlan } from "@/lib/authz/contract";
 import { SampleScreens } from "@/sample/screen";
+import type { RowFocus } from "@/sample/run-action";
 
 type Persona = {
   id: string;
@@ -36,20 +37,16 @@ export function Workspace() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [userId, setUserId] = useState("");
   const [matrix, setMatrix] = useState<AccessMatrix | null>(null);
+  const [focus, setFocus] = useState<RowFocus>({ projectIds: [], documentIds: [], organizationIds: [] });
   const requestId = useRef(0);
-
-  const loadMatrix = useCallback(async () => {
-    const result = await request<AccessMatrix>("/api/catalog");
-    if (result.ok) setMatrix(result.data);
-  }, []);
 
   const activate = useCallback(async (id: string) => {
     const token = ++requestId.current;
     setUserId(id);
+    setFocus({ projectIds: [], documentIds: [], organizationIds: [] });
     const switched = await request("/api/session", { method: "POST", body: JSON.stringify({ userId: id }) });
     if (token !== requestId.current || !switched.ok) return;
-    await loadMatrix();
-  }, [loadMatrix]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -58,6 +55,8 @@ export function Workspace() {
       const personaResult = await request<{ personas: Persona[] }>("/api/personas");
       if (!active || !personaResult.ok) return;
       setPersonas(personaResult.data.personas);
+      const catalog = await request<AccessMatrix>("/api/catalog");
+      if (active && catalog.ok) setMatrix(catalog.data);
       const meResult = await request<{ user: Persona }>("/api/me");
       if (!active) return;
       const id = meResult.ok ? meResult.data.user.id : personaResult.data.personas[0]?.id;
@@ -97,13 +96,15 @@ export function Workspace() {
       </header>
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
-        <section className="min-h-0 overflow-auto rounded-xl border p-4">
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">動作する画面</h2>
-          {selected ? (
-            <SampleScreens key={selected.id} persona={selected} onChanged={() => void loadMatrix()} />
-          ) : (
-            <p className="text-sm text-muted-foreground">ユーザーを読み込んでいます。</p>
-          )}
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border p-4">
+          <h2 className="mb-3 shrink-0 text-sm font-medium text-muted-foreground">動作する画面</h2>
+          <div className="flex min-h-0 flex-1 flex-col">
+            {selected ? (
+              <SampleScreens key={selected.id} persona={selected} onFocus={setFocus} />
+            ) : (
+              <p className="text-sm text-muted-foreground">ユーザーを読み込んでいます。</p>
+            )}
+          </div>
         </section>
         <section className="flex min-h-0 flex-col rounded-xl border p-4">
           <h2 className="mb-3 shrink-0 text-sm font-medium text-muted-foreground">認可の対応表</h2>
@@ -113,6 +114,7 @@ export function Workspace() {
                 matrix={matrix}
                 personas={personas}
                 selectedId={userId}
+                focus={focus}
                 onSelect={(id) => {
                   void activate(id);
                 }}

@@ -1,7 +1,7 @@
 import { subject } from "@/lib/authz/ability";
 import { authorizeFeature } from "@/lib/authz/gate";
 import { clearanceLevels } from "@/lib/authz/principal";
-import { jsonError, requireSession } from "@/lib/api";
+import { isSamplePreview, jsonError, requireSession } from "@/lib/api";
 import { attributeDenied, denialResponse, whereCan } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
@@ -68,5 +68,6 @@ export async function POST(request: Request) {
     },
     select: { id: true },
   });
+  if (isSamplePreview(request)) await prisma.document.delete({ where: { id: document.id } });
   return Response.json({ id: document.id }, { status: 201 });
 }

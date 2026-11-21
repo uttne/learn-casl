@@ -1,7 +1,7 @@
 import { subject } from "@/lib/authz/ability";
 import { authorizeFeature, authorizeFeatureSomewhere } from "@/lib/authz/gate";
 import { projectVisibilities, type ProjectVisibility } from "@/lib/authz/principal";
-import { jsonError, requireSession } from "@/lib/api";
+import { isSamplePreview, jsonError, requireSession } from "@/lib/api";
 import {
   attributeDenied,
   denialResponse,
@@ -92,5 +92,6 @@ export async function POST(request: Request) {
   }
 
   const project = await prisma.project.create({ data: candidate, select: { id: true } });
+  if (isSamplePreview(request)) await prisma.project.delete({ where: { id: project.id } });
   return Response.json({ id: project.id }, { status: 201 });
 }
