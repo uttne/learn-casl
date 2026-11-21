@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { defineAbilityFor } from "@/lib/authz/ability";
-import { listVisibleProjects, whereCan } from "@/lib/dal";
+import { listAccessMatrix, listVisibleProjects, whereCan } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 async function abilityFor(email: string) {
@@ -77,6 +77,31 @@ describe("accessible queries", () => {
         documents: ["Confidential results", "Public abstract"],
       },
     ]);
+  });
+
+  it("keeps the stored records next to each account's API payload", async () => {
+    const matrix = await listAccessMatrix();
+    expect(matrix.projects.map((project) => project.title)).toEqual([
+      "Ben draft",
+      "Platform API",
+      "Sales pipeline",
+      "Vaccine study",
+    ]);
+    const stored = matrix.projects
+      .find((project) => project.title === "Platform API")
+      ?.documents.find((document) => document.title === "Confidential keys");
+    expect(stored?.body).toBe("本番の鍵の所在です。");
+
+    const dana = await prisma.user.findUniqueOrThrow({ where: { email: "dana@acme.test" } });
+    const view = matrix.views.find((item) => item.userId === dana.id);
+    const returnedTitles = matrix.projects
+      .filter((project) => view?.projects.some((item) => item.id === project.id))
+      .map((project) => project.title);
+    expect(returnedTitles).toEqual(["Platform API", "Sales pipeline"]);
+    const keys = view?.projects
+      .flatMap((project) => project.documents)
+      .find((document) => document.id === stored?.id);
+    expect(keys).toMatchObject({ body: "この等級の本文は表示できません", bodyAccess: "replaced", emailAccess: "visible" });
   });
 
   it("masks or replaces fields on rows that stay in the result", async () => {

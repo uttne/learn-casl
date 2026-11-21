@@ -1,24 +1,16 @@
-import { featureMap } from "@/lib/authz/gate";
+import { toPersonaProfile } from "@/lib/authz/profile";
 import { requireSession } from "@/lib/api";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const result = await requireSession();
   if ("response" in result) return result.response;
 
-  const { session } = result;
-  return Response.json({
-    user: {
-      id: session.user.id,
-      email: session.user.email,
-      name: session.user.name,
-      description: session.user.description,
-      organizations: session.user.organizations.map((organization) => ({
-        ...organization,
-        features: featureMap(
-          { api: session.access.api, organizations: session.user.organizations },
-          organization.id,
-        ),
-      })),
-    },
+  const user = await prisma.user.findUnique({
+    where: { id: result.session.user.id },
+    include: { memberships: { include: { organization: true } } },
   });
+  if (!user) return Response.json({ error: "先にユーザーを選んでください", layer: "session" }, { status: 401 });
+
+  return Response.json({ user: toPersonaProfile(user) });
 }
