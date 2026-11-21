@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { defineAbilityFor } from "@/lib/authz/ability";
-import { listAccessMatrix, listVisibleProjects, whereCan } from "@/lib/dal";
+import { whereCan } from "@/lib/authz/rows";
+import { listAccessMatrix, listVisibleProjects } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 async function abilityFor(email: string) {

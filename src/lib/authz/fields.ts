@@ -1,5 +1,38 @@
-import { subject, type AppAbility } from "@/lib/authz/ability";
-import type { DocumentStatus, ProjectStatus, ProjectVisibility } from "@/lib/authz/principal";
+import { subject, type AbilityBuilder } from "@casl/ability";
+import type { AppAbility } from "@/lib/authz/casl";
+import type { DocumentStatus, MembershipAttributes, ProjectStatus, ProjectVisibility } from "@/lib/authz/principal";
+import { readableDocumentWhere } from "@/lib/authz/rows";
+
+type Allow = AbilityBuilder<AppAbility>["can"];
+
+/**
+ * 第3層。行として返る文書の、項目ごとの出し方。
+ *
+ * read は行を残すかです。項目は view / mask / replace の別アクションにします。
+ * 同じ read に混ぜると、accessibleBy("read") の WHERE が項目条件で狭くなります。
+ * 等級が足りない文書も行は返し、本文だけを変えます。
+ */
+export function grantFieldAccess(can: Allow, userId: string, membership: MembershipAttributes) {
+  const readableDocument = readableDocumentWhere(userId, membership);
+
+  can("view", "Document", ["title", "status", "classificationRank"], readableDocument);
+  can("view", "Document", ["body"], {
+    AND: [readableDocument, { classificationRank: { lte: membership.clearance } }],
+  });
+  // 一つ上の等級だけマスク。それより上は置換。どちらも行は残っている。
+  can("mask", "Document", ["body"], {
+    AND: [readableDocument, { classificationRank: membership.clearance + 1 }],
+  });
+  can("replace", "Document", ["body"], {
+    AND: [readableDocument, { classificationRank: { gt: membership.clearance + 1 } }],
+  });
+
+  if (membership.role === "guest") {
+    can("replace", "Document", ["authorEmail"], readableDocument);
+  } else {
+    can("view", "Document", ["authorEmail"], readableDocument);
+  }
+}
 
 export type FieldAccess = "visible" | "masked" | "replaced";
 
@@ -37,6 +70,7 @@ export type PresentedDocument = {
 };
 
 function fieldAccess(ability: AppAbility, document: PresentableDocument, field: "body" | "authorEmail"): FieldAccess {
+  // Prisma の結果はクラスではない。subject で「これは Document」と CASL に渡す。
   const tagged = subject("Document", {
     id: document.id,
     title: document.title,
@@ -52,6 +86,7 @@ function fieldAccess(ability: AppAbility, document: PresentableDocument, field: 
   return "replaced";
 }
 
+/** 読めた行を、API が返してよい形に変換します。元の本文はここでは外に出しません。 */
 export function presentDocument(ability: AppAbility, document: PresentableDocument): PresentedDocument {
   const bodyAccess = fieldAccess(ability, document, "body");
   const emailAccess = fieldAccess(ability, document, "authorEmail");

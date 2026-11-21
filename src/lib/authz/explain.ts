@@ -2,6 +2,7 @@ import type { Feature, FeatureState } from "@/lib/authz/contract";
 import type { MembershipRole } from "@/lib/authz/principal";
 import { classificationLabel } from "@/lib/labels";
 
+/** 画面の右に出す、この所属で行と項目がどうなるかの文章。判定そのものではない。 */
 export function explainDataAccess(
   membership: { role: MembershipRole; department: string; clearance: number },
   features: Record<Feature, FeatureState>,

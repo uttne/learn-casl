@@ -1,12 +1,13 @@
 import { authorizeFeatureSomewhere } from "@/lib/authz/gate";
-import { requireSession } from "@/lib/api";
-import { denialResponse, listVisibleAudit } from "@/lib/dal";
+import { denialResponse, requireSession } from "@/lib/api";
+import { listVisibleAudit } from "@/lib/dal";
 
 export async function GET() {
   const result = await requireSession();
   if ("response" in result) return result.response;
   const { session } = result;
 
+  // 監査は Enterprise の契約と、オーナーか管理者の API 入口を先に通す。
   const gate = { api: session.access.api, organizations: session.user.organizations };
   const allowed = authorizeFeatureSomewhere(gate, "audit.read");
   if (!allowed.ok) return denialResponse(allowed);

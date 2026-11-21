@@ -1,3 +1,8 @@
+/**
+ * 契約。画面を出すか、API を 404 にするかを決めます。
+ * 誰がその機能を使えるかは api-access.ts です。ここではプランに含まれるかだけを見ます。
+ */
+
 export const organizationPlans = ["starter", "business", "enterprise"] as const;
 
 export type OrganizationPlan = (typeof organizationPlans)[number];
@@ -50,7 +55,7 @@ export function contractIncludes(plan: OrganizationPlan, feature: Feature) {
   return (planFeatures[plan] as readonly Feature[]).includes(feature);
 }
 
-/** Contract hides a feature. ABAC leaves a contracted feature disabled. */
+/** 契約に無ければ hidden。契約にあって API 入口が拒否なら disabled。両方通れば enabled。 */
 export function featureState(contracted: boolean, allowed: boolean): FeatureState {
   if (!contracted) return "hidden";
   if (!allowed) return "disabled";

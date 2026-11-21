@@ -28,6 +28,10 @@ export type Session = {
   access: Access;
 };
 
+/**
+ * クッキーのユーザーから、そのリクエストの Principal と Ability を作ります。
+ * Ability は保存しません。所属が変われば次のリクエストで作り直します。
+ */
 export async function getSession(): Promise<Session | null> {
   const jar = await cookies();
   const userId = jar.get(SESSION_COOKIE)?.value;

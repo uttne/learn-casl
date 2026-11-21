@@ -17,6 +17,11 @@ export { accessibleBy, createPrismaAbility };
 export type PrismaQuery<T extends ForcedSubject<string> = ForcedSubject<string>> =
   PrismaQueryOf<Prisma.TypeMap, T>;
 
+/**
+ * data Ability のアクションです。
+ * read は行を残すか。view / mask / replace は残った行の項目。
+ * publish と archive は、その行を更新してよいかです。
+ */
 export type AppActions =
   | "manage"
   | "create"

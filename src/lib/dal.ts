@@ -1,21 +1,8 @@
-import { defineAbilityFor, subject, type AppAbility } from "@/lib/authz/ability";
-import { accessibleBy, type AppActions } from "@/lib/authz/casl";
-import {
-  featureMap,
-  type FeatureGate,
-  type GateDenial,
-} from "@/lib/authz/gate";
-import { presentDocument, type FieldAccess, type PresentedDocument } from "@/lib/authz/present";
-import type { Feature } from "@/lib/authz/contract";
+import { defineAbilityFor, type AppAbility } from "@/lib/authz/ability";
+import { presentDocument, type FieldAccess } from "@/lib/authz/fields";
 import { toPersonaProfile } from "@/lib/authz/profile";
+import { whereCan } from "@/lib/authz/rows";
 import { prisma } from "@/lib/prisma";
-
-type SubjectName = "Organization" | "Membership" | "Project" | "Document";
-
-/** Put this first inside `AND` so an empty CASL condition short-circuits. */
-export function whereCan<T extends SubjectName>(ability: AppAbility, action: AppActions, subjectType: T) {
-  return accessibleBy(ability, action).ofType(subjectType);
-}
 
 const documentInclude = {
   author: { select: { id: true, name: true, email: true } },
@@ -124,6 +111,7 @@ export async function listPersonas() {
   return users.map((user) => toPersonaProfile(user));
 }
 
+/** 契約を通過した組織に絞ったあと、行の WHERE で残し、文書は presentDocument で項目を変換します。 */
 export async function listVisibleProjects(ability: AppAbility, organizationIds?: string[]) {
   const projects = await prisma.project.findMany({
     where: {
@@ -176,77 +164,4 @@ export async function listVisibleAudit(ability: AppAbility, organizationIds: str
     projectId: document.projectId,
     ...presentDocument(ability, document),
   }));
-}
-
-export function actionState(
-  gate: FeatureGate,
-  feature: Feature,
-  organizationId: string,
-  allowedOnRow: boolean,
-): "hidden" | "disabled" | "enabled" {
-  const state = featureMap(gate, organizationId)[feature];
-  if (state !== "enabled") return state;
-  return allowedOnRow ? "enabled" : "disabled";
-}
-
-export function projectArchiveState(
-  gate: FeatureGate,
-  ability: AppAbility,
-  project: {
-    id: string;
-    title: string;
-    organizationId: string;
-    ownerId: string;
-    department: string;
-    visibility: "private" | "department" | "organization";
-    status: "draft" | "active" | "archived";
-  },
-) {
-  return actionState(
-    gate,
-    "projects.archive",
-    project.organizationId,
-    ability.can("archive", subject("Project", project)),
-  );
-}
-
-export function documentPublishState(
-  gate: FeatureGate,
-  ability: AppAbility,
-  document: PresentedDocument & {
-    authorId: string;
-    project: {
-      id: string;
-      organizationId: string;
-      ownerId: string;
-      department: string;
-      visibility: "private" | "department" | "organization";
-      status: "draft" | "active" | "archived";
-    };
-  },
-) {
-  return actionState(
-    gate,
-    "documents.publish",
-    document.project.organizationId,
-    ability.can(
-      "publish",
-      subject("Document", {
-        id: document.id,
-        title: document.title,
-        authorId: document.authorId,
-        classificationRank: document.classificationRank,
-        status: document.status,
-        project: document.project,
-      }),
-    ),
-  );
-}
-
-export function denialResponse(denial: GateDenial) {
-  return Response.json({ error: denial.error, layer: denial.layer }, { status: denial.status });
-}
-
-export function attributeDenied(error: string) {
-  return Response.json({ error, layer: "attribute" }, { status: 403 });
 }

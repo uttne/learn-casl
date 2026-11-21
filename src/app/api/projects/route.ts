@@ -1,24 +1,21 @@
 import { subject } from "@/lib/authz/ability";
+import { documentPublishState, projectArchiveState } from "@/lib/authz/action-state";
 import { authorizeFeature, authorizeFeatureSomewhere } from "@/lib/authz/gate";
 import { projectVisibilities, type ProjectVisibility } from "@/lib/authz/principal";
-import { isSamplePreview, jsonError, requireSession } from "@/lib/api";
-import {
-  attributeDenied,
-  denialResponse,
-  documentPublishState,
-  listVisibleProjects,
-  projectArchiveState,
-} from "@/lib/dal";
+import { attributeDenied, denialResponse, isSamplePreview, jsonError, requireSession } from "@/lib/api";
+import { listVisibleProjects } from "@/lib/dal";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const result = await requireSession();
   if ("response" in result) return result.response;
   const { session } = result;
+  // 契約と API 入口。通過した組織だけを、その次の行の取得に渡す。
   const gate = { api: session.access.api, organizations: session.user.organizations };
   const allowed = authorizeFeatureSomewhere(gate, "projects.read");
   if (!allowed.ok) return denialResponse(allowed);
 
+  // 行の WHERE と、残った文書の項目変換は listVisibleProjects の中。
   const projects = await listVisibleProjects(session.access.data, allowed.organizationIds);
   return Response.json({
     projects: projects.map((project) => ({
@@ -75,10 +72,12 @@ export async function POST(request: Request) {
     return jsonError(400, "input", "公開範囲が不正です");
   }
 
+  // 入口。この組織のプランと、その組織で projects.create を呼べるか。
   const gate = { api: session.access.api, organizations: session.user.organizations };
   const allowed = authorizeFeature(gate, organizationId, "projects.create");
   if (!allowed.ok) return denialResponse(allowed);
 
+  // 行。候補そのものを data Ability に渡す。WHERE ではまだ存在しない行のため。
   const candidate = {
     title,
     organizationId,

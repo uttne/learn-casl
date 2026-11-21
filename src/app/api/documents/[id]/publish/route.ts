@@ -1,6 +1,6 @@
 import { authorizeFeatureSomewhere } from "@/lib/authz/gate";
-import { isSamplePreview, requireSession } from "@/lib/api";
-import { attributeDenied, denialResponse, whereCan } from "@/lib/dal";
+import { whereCan } from "@/lib/authz/rows";
+import { attributeDenied, denialResponse, isSamplePreview, requireSession } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -9,6 +9,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { session } = result;
   const { id } = await context.params;
 
+  // 入口。公開できる組織が一つも無ければ、行は見ない。
   const gate = { api: session.access.api, organizations: session.user.organizations };
   const allowed = authorizeFeatureSomewhere(gate, "documents.publish");
   if (!allowed.ok) return denialResponse(allowed);
@@ -16,6 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const current = await prisma.document.findUnique({ where: { id }, select: { status: true } });
   const updated = await prisma.document.updateMany({
     where: {
+      // 入口で残った組織と、行ルールの WHERE を両方とも満たす行だけ更新する。
       AND: [
         { id },
         { project: { is: { organizationId: { in: allowed.organizationIds } } } },

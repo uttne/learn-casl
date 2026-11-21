@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { OrganizationPlan } from "@/lib/authz/contract";
 import type { RowFocus } from "@/sample/run-action";
-import type { FieldAccess } from "@/lib/authz/present";
+import type { FieldAccess } from "@/lib/authz/fields";
 import {
   classificationLabel,
   documentStatusLabel,

@@ -18,7 +18,7 @@ export const clearanceLevels = [1, 2, 3] as const;
 
 export type Clearance = (typeof clearanceLevels)[number];
 
-/** Attributes that travel with a user inside one organization. */
+/** 一つの組織の中での属性。同じ人でも組織が違えばロールもクリアランスも違います。 */
 export type MembershipAttributes = {
   organizationId: string;
   role: MembershipRole;
@@ -26,7 +26,10 @@ export type MembershipAttributes = {
   clearance: number;
 };
 
-/** The authenticated user, plus the attributes authorization is allowed to see. */
+/**
+ * 認可が見てよい本人情報。メールや表示名は入れません。
+ * プランも入れません。契約は組織の属性として gate.ts が別に見ます。
+ */
 export type Principal = {
   id: string;
   memberships: MembershipAttributes[];

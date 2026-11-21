@@ -1,8 +1,8 @@
 import { subject } from "@/lib/authz/ability";
 import { authorizeFeature } from "@/lib/authz/gate";
 import { clearanceLevels } from "@/lib/authz/principal";
-import { isSamplePreview, jsonError, requireSession } from "@/lib/api";
-import { attributeDenied, denialResponse, whereCan } from "@/lib/dal";
+import { whereCan } from "@/lib/authz/rows";
+import { attributeDenied, denialResponse, isSamplePreview, jsonError, requireSession } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     return jsonError(400, "input", "等級が不正です");
   }
 
+  // 親プロジェクトがこの人の行として読めるか。読めなければ契約の判定より先に属性で返す。
   const project = await prisma.project.findFirst({
     where: {
       AND: [{ id: projectId }, whereCan(session.access.data, "read", "Project")],
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
   });
   if (!project) return attributeDenied("プロジェクトが見つからないか、参照できません");
 
+  // 入口。読めたプロジェクトの組織で、文書作成が契約とロールの両方を通るか。
   const gate = { api: session.access.api, organizations: session.user.organizations };
   const allowed = authorizeFeature(gate, project.organizationId, "documents.create");
   if (!allowed.ok) return denialResponse(allowed);
@@ -53,6 +55,7 @@ export async function POST(request: Request) {
     status: "draft" as const,
     project,
   };
+  // 行。等級、下書き、親がアーカイブされていないこと、を候補オブジェクトで見る。
   if (!session.access.data.can("create", subject("Document", candidate))) {
     return attributeDenied("この文書を作成する権限がありません。等級、プロジェクトの状態、所属を確認してください");
   }
