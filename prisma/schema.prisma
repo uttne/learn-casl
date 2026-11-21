@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MembershipRole {
+  owner
+  admin
+  member
+  guest
+}
+
+enum ProjectVisibility {
+  private
+  department
+  organization
+}
+
+enum ProjectStatus {
+  draft
+  active
+  archived
+}
+
+enum DocumentStatus {
+  draft
+  published
+}
+
+enum OrganizationPlan {
+  starter
+  business
+  enterprise
+}
+
+model User {
+  id                String       @id @default(cuid())
+  email             String       @unique
+  name              String
+  description       String
+  memberships       Membership[]
+  ownedProjects     Project[]    @relation("ProjectOwner")
+  authoredDocuments Document[]   @relation("DocumentAuthor")
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  plan        OrganizationPlan @default(starter)
+  memberships Membership[]
+  projects    Project[]
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole
+  department     String
+  clearance      Int
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model Project {
+  id             String            @id @default(cuid())
+  organizationId String
+  ownerId        String
+  title          String
+  department     String
+  visibility     ProjectVisibility
+  status         ProjectStatus     @default(active)
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner          User              @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  documents      Document[]
+
+  @@index([organizationId])
+}
+
+model Document {
+  id                 String         @id @default(cuid())
+  projectId          String
+  authorId           String
+  title              String
+  body               String
+  classificationRank Int
+  status             DocumentStatus @default(draft)
+  project            Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author             User           @relation("DocumentAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([projectId])
+}
