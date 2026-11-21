@@ -11,7 +11,7 @@ Scylla は、Next.js の Route Handler、Prisma、CASL、PostgreSQL で、画面
 
 | 文書 | 内容 |
 | --- | --- |
-| [関数の呼び出し](./calls.md) | ボタンから Route、契約、行、項目まで。シーケンス図と全体図 |
+| [関数の呼び出し](./calls.md) | ロールの定義、画面の出し分け、API が WHERE を作るまで |
 | [アーキテクチャ](./architecture.md) | 画面、Route Handler、2 つの Ability、契約ゲートの接続 |
 | [認可ルール](./authorization.md) | プラン、API 操作、行、項目。シードの人物で追跡できる |
 | [データベース](./database.md) | ER 図、列挙型、テーブルと外部キー |
